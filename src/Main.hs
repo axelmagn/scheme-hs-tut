@@ -11,6 +11,7 @@ data LispVal = Atom String
              | DottedList [LispVal] LispVal
              | Number Integer
              | String String
+             | Character Char
              | Bool Bool
 
 
@@ -68,22 +69,18 @@ parseNumber = do
     num <- octal <|> hexadecimal <|> decimal
     return $ Number num
     where
-        octal :: Parser Integer
         octal = do
-            _ <- string "#o"
+            string "#o"
             digits <- many1 $ oneOf "01234567"
             return $ fst . head . readOct $ digits
-        decimal :: Parser Integer
         decimal = do
-            _ <- optional $ string "#d"
+            optional $ string "#d"
             digits <- many1 $ oneOf "0123456789"
             return $ fst . head . readDec $ digits
-        hexadecimal :: Parser Integer
         hexadecimal = do
-            _ <- string "#x"
+            string "#x"
             digits <- many1 $ oneOf "0123456789abcdefABCDEF"
             return $ fst . head . readHex $ digits
-
 
 
 parseExpr :: Parser LispVal
