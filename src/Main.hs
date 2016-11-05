@@ -29,9 +29,14 @@ readExpr input = case parse parseExpr "lisp" input of
 
 parseExpr :: Parser LispVal
 parseExpr = parseCharacter
+         <|> parseAtom
          <|> parseString
          <|> parseNumber
-         <|> parseAtom
+         <|> parseQuoted
+         <|> do _ <- char '('
+                x <- try parseList <|> parseDottedList
+                _ <- char ')'
+                return x
 
 
 symbol :: Parser Char
@@ -77,16 +82,13 @@ parseNumber = do
     return $ Number num
     where
         octal = do
-            _ <- string "#o"
-            digits <- many1 octDigit
+            digits <- string "#o" >> many1 octDigit
             return $ fst . head . readOct $ digits
         hexadecimal = do
-            _ <- string "#x"
-            digits <- many1 hexDigit
+            digits <- string "#x" >> many1 hexDigit
             return $ fst . head . readHex $ digits
         decimal = do
-            optional $ string "#d"
-            digits <- many1 digit
+            digits <- optional (string "#d") >> many1 digit
             return $ fst . head . readDec $ digits
 
 
@@ -103,3 +105,20 @@ parseCharacter = do
                 "space" -> return ' '
                 "newline" -> return '\n'
                 _ -> fail "Unrecognized Character Name"
+
+
+parseList :: Parser LispVal
+parseList = List <$> sepBy parseExpr spaces
+
+
+parseDottedList :: Parser LispVal
+parseDottedList = do
+    headExprs <- endBy parseExpr spaces
+    tailExpr <- char '.' >> spaces >> parseExpr
+    return $ DottedList headExprs tailExpr
+
+
+parseQuoted :: Parser LispVal
+parseQuoted = do
+    x <- char '\'' >> parseExpr
+    return $ List [Atom "quote", x]
