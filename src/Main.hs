@@ -13,7 +13,7 @@ data LispVal = Atom String
              | String String
              | Character Char
              | Bool Bool
-
+             deriving(Show)
 
 main :: IO ()
 main = do
@@ -24,7 +24,14 @@ main = do
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
     Left err  -> "No match: " ++ show err
-    Right val -> "Found value"
+    Right val -> "Found value: " ++ show val
+
+
+parseExpr :: Parser LispVal
+parseExpr = parseCharacter
+         <|> parseString
+         <|> parseNumber
+         <|> parseAtom
 
 
 symbol :: Parser Char
@@ -35,6 +42,7 @@ spaces :: Parser ()
 spaces = skipMany1 space
 
 
+parseAtom :: Parser LispVal
 parseAtom = do
     first <- letter <|> symbol
     rest <- many (letter <|> digit <|> symbol)
@@ -47,10 +55,9 @@ parseAtom = do
 
 parseString :: Parser LispVal
 parseString = do
-    char '"'
-    -- x <- many (noneOf "\"") <|> many (string "\\\"")
+    _ <- char '"'
     xs <- many strChar
-    char '"'
+    _ <- char '"'
     let str = concat xs
     return $ String str
     where strChar :: Parser String
@@ -70,20 +77,29 @@ parseNumber = do
     return $ Number num
     where
         octal = do
-            string "#o"
-            digits <- many1 $ oneOf "01234567"
+            _ <- string "#o"
+            digits <- many1 octDigit
             return $ fst . head . readOct $ digits
+        hexadecimal = do
+            _ <- string "#x"
+            digits <- many1 hexDigit
+            return $ fst . head . readHex $ digits
         decimal = do
             optional $ string "#d"
-            digits <- many1 $ oneOf "0123456789"
+            digits <- many1 digit
             return $ fst . head . readDec $ digits
-        hexadecimal = do
-            string "#x"
-            digits <- many1 $ oneOf "0123456789abcdefABCDEF"
-            return $ fst . head . readHex $ digits
 
 
-parseExpr :: Parser LispVal
-parseExpr =  parseAtom
-         <|> parseString
-         <|> parseNumber
+parseCharacter :: Parser LispVal
+parseCharacter = do
+    _ <- string "#\\"
+    c <- try parseCharacterName <|> anyChar
+    return $ Character c
+    where
+        parseCharacterName :: Parser Char
+        parseCharacterName = do
+            name <- many1 alphaNum
+            case name of
+                "space" -> return ' '
+                "newline" -> return '\n'
+                _ -> fail "Unrecognized Character Name"
